@@ -14,8 +14,8 @@ import {
 
 // Configuration de l'API
 const API_BASE_URL = import.meta.env.PROD 
-  ? '/api'  // En production, Vercel route vers /backend
-  : 'http://localhost:3001'; // En développement, serveur local
+  ? '/api'  // En production, Vercel serverless functions
+  : 'http://localhost:3001'; // En développement, serveur local backend
 
 function App() {
   const [file, setFile] = useState(null);
@@ -61,16 +61,21 @@ function App() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const response = await axios.post(`${API_BASE_URL}/ocr`, formData, {
+      
+      // Utiliser la fonction serverless Vercel
+      const apiUrl = import.meta.env.PROD ? '/api/ocr' : 'http://localhost:3001/ocr';
+      
+      const response = await axios.post(apiUrl, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 120000,
       });
+      
       setOcrUrl(response.data.ocrUrl);
       setLoading(false);
     } catch (error) {
       console.error('Erreur OCR:', error);
       if (error.code === 'ECONNABORTED') {
-        setError('Timeout: Le traitement OCR prend trop de temps. Vérifiez vos logs backend.');
+        setError('Timeout: Le traitement OCR prend trop de temps. Veuillez réessayer.');
       } else if (error.response) {
         setError(`Erreur: ${error.response.data.error || error.response.data.details || 'Erreur inconnue'}`);
       } else {

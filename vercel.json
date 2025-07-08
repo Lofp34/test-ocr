@@ -1,21 +1,8 @@
 {
   "version": 2,
   "functions": {
-    "backend/index.js": {
+    "api/ocr.js": {
       "maxDuration": 30
     }
-  },
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/backend/index.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/frontend/dist/$1"
-    }
-  ],
-  "buildCommand": "cd frontend && npm run build",
-  "outputDirectory": "frontend/dist",
-  "installCommand": "npm install && cd frontend && npm install && cd ../backend && npm install"
+  }
 }

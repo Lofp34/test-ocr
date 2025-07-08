@@ -1,0 +1,11 @@
+{
+  "name": "rational-ocr-api",
+  "version": "1.0.0",
+  "description": "API serverless pour OCR Intelligence",
+  "main": "ocr.js",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.50.3",
+    "formidable": "^3.5.1",
+    "pdf-lib": "^1.17.1"
+  }
+} 
