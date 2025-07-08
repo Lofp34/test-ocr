@@ -4,10 +4,9 @@
   "description": "Application OCR Intelligence par Rational Consulting",
   "private": true,
   "dependencies": {
+    "@mistralai/mistralai": "^0.5.0",
     "@supabase/supabase-js": "^2.44.2",
-    "canvas": "^2.11.2",
     "formidable": "^3.5.1",
-    "pdf-lib": "^1.17.1",
-    "pdfjs-dist": "4.4.175"
+    "pdf-lib": "^1.17.1"
   }
 }

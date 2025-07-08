@@ -2,8 +2,7 @@ import formidable from 'formidable';
 import { createClient } from '@supabase/supabase-js';
 import { PDFDocument, rgb } from 'pdf-lib';
 import fs from 'fs';
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
-import { createCanvas } from 'canvas';
+import MistralClient from '@mistralai/mistralai';
 
 // Configuration Supabase
 const supabase = createClient(
@@ -12,96 +11,39 @@ const supabase = createClient(
 );
 
 // Configuration Mistral
-const MISTRAL_API_URL = 'https://api.mistral.ai/v1/chat/completions';
+const mistralClient = new MistralClient(process.env.MISTRAL_API_KEY);
 
-async function convertPdfToImages(fileBuffer) {
-  const images = [];
-  const loadingTask = pdfjsLib.getDocument({ data: fileBuffer });
-  const pdf = await loadingTask.promise;
-  const numPages = pdf.numPages;
-
-  console.log(`📄 Le PDF contient ${numPages} page(s).`);
-
-  for (let i = 1; i <= numPages; i++) {
-    const page = await pdf.getPage(i);
-    const viewport = page.getViewport({ scale: 1.5 });
-    const canvas = createCanvas(viewport.width, viewport.height);
-    const context = canvas.getContext('2d');
-    
-    const renderContext = {
-      canvasContext: context,
-      viewport: viewport,
-    };
-    
-    await page.render(renderContext).promise;
-    images.push(canvas.toDataURL('image/png'));
-    console.log(`🖼️ Page ${i} convertie en image.`);
-  }
-
-  return images;
-}
-
-
-async function processOCRWithMistral(images, fileName) {
+async function processOCRWithMistral(fileBuffer, fileName) {
   try {
-    console.log(`🔍 Début du traitement OCR pour: ${fileName} (${images.length} image(s))`);
-
-    const userContent = [
-      {
-        type: "text",
-        text: "Analyse ce document et extrait tout le texte de manière structurée. Le document peut contenir plusieurs pages (images). Retourne uniquement le texte extrait, sans commentaires supplémentaires."
-      }
-    ];
-
-    images.forEach(dataUrl => {
-      userContent.push({
-        type: "image_url",
-        image_url: {
-          url: dataUrl
-        }
-      });
-    });
-
-    // Configuration de la requête Mistral
-    const requestBody = {
-      model: "pixtral-12b-2409",
-      messages: [
-        {
-          role: "user",
-          content: userContent
-        }
-      ],
-      max_tokens: 8000,
-      temperature: 0.1
-    };
-
-    console.log('📡 Envoi de la requête à Mistral API...');
+    console.log(`🔍 Début du traitement OCR pour: ${fileName} avec le modèle mistral-ocr-latest`);
     
-    const response = await fetch(MISTRAL_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.MISTRAL_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody)
+    // Convertir le buffer en base64
+    const base64Pdf = fileBuffer.toString('base64');
+    const dataUrl = `data:application/pdf;base64,${base64Pdf}`;
+
+    console.log('📡 Envoi de la requête à Mistral OCR API...');
+    const ocrResponse = await mistralClient.ocr.process({
+      model: "mistral-ocr-latest",
+      document: {
+        type: "document_url",
+        documentUrl: dataUrl
+      }
     });
+    
+    console.log('✅ Réponse Mistral OCR reçue');
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Erreur Mistral API:', response.status, errorText);
-      throw new Error(`Erreur Mistral API: ${response.status} - ${errorText}`);
+    // La réponse contient une liste de pages, chaque page a une liste d'extractions.
+    // Nous allons concaténer le texte de toutes les extractions de toutes les pages.
+    const extractedText = ocrResponse.pages
+      .map(page => page.extractions.map(extraction => extraction.text).join('\\n'))
+      .join('\\n\\n');
+
+    if (!extractedText) {
+      console.warn('⚠️ Le traitement OCR n\'a retourné aucun texte.');
+      return '';
     }
 
-    const data = await response.json();
-    console.log('✅ Réponse Mistral reçue');
-
-    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-      throw new Error('Format de réponse Mistral invalide');
-    }
-
-    const extractedText = data.choices[0].message.content;
     console.log(`📝 Texte extrait: ${extractedText.length} caractères`);
-
     return extractedText;
 
   } catch (error) {
@@ -235,17 +177,13 @@ export default async function handler(req, res) {
       throw new Error(`Erreur upload: ${uploadError.message}`);
     }
 
-    // 2. Conversion du PDF en images
-    console.log('🔄 Conversion du PDF en images...');
-    const images = await convertPdfToImages(fileBuffer);
+    // 2. Traitement OCR avec Mistral
+    const extractedText = await processOCRWithMistral(fileBuffer, file.originalFilename);
 
-    // 3. Traitement OCR avec Mistral
-    const extractedText = await processOCRWithMistral(images, file.originalFilename);
-
-    // 4. Création du PDF OCRisé
+    // 3. Création du PDF OCRisé
     const ocrPdfBuffer = await createOCRPDF(extractedText, file.originalFilename);
 
-    // 5. Upload du PDF OCRisé
+    // 4. Upload du PDF OCRisé
     const ocrFileName = `ocr_${originalFileName}`;
     const ocrPath = `ocrises/${ocrFileName}`;
 
@@ -261,7 +199,7 @@ export default async function handler(req, res) {
       throw new Error(`Erreur upload OCR: ${ocrUploadError.message}`);
     }
 
-    // 6. Génération de l'URL de téléchargement
+    // 5. Génération de l'URL de téléchargement
     const { data: urlData } = supabase.storage
       .from('factures')
       .getPublicUrl(ocrPath);
