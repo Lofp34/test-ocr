@@ -140,6 +140,6 @@ MIT License - voir [LICENSE](LICENSE) pour plus de détails.
 
 ---
 
-**Développé avec ❤️ par [Rational Consulting](https://rational-consulting.fr)**
+**Développé avec ❤️ par [Rational Consulting](https://rational-consulting.fr)** test
 
 *Propulsé par Mistral AI • Sécurisé et confidentiel* Derniere mise a jour: Tue Jul  8 21:24:04 CEST 2025
