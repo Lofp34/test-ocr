@@ -2,6 +2,8 @@ import formidable from 'formidable';
 import { createClient } from '@supabase/supabase-js';
 import { PDFDocument, rgb } from 'pdf-lib';
 import fs from 'fs';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
+import { createCanvas } from 'canvas';
 
 // Configuration Supabase
 const supabase = createClient(
@@ -12,13 +14,53 @@ const supabase = createClient(
 // Configuration Mistral
 const MISTRAL_API_URL = 'https://api.mistral.ai/v1/chat/completions';
 
-async function processOCRWithMistral(fileBuffer, fileName) {
-  try {
-    console.log(`🔍 Début du traitement OCR pour: ${fileName}`);
+async function convertPdfToImages(fileBuffer) {
+  const images = [];
+  const loadingTask = pdfjsLib.getDocument({ data: fileBuffer });
+  const pdf = await loadingTask.promise;
+  const numPages = pdf.numPages;
+
+  console.log(`📄 Le PDF contient ${numPages} page(s).`);
+
+  for (let i = 1; i <= numPages; i++) {
+    const page = await pdf.getPage(i);
+    const viewport = page.getViewport({ scale: 1.5 });
+    const canvas = createCanvas(viewport.width, viewport.height);
+    const context = canvas.getContext('2d');
     
-    // Convertir le buffer en base64
-    const base64Data = fileBuffer.toString('base64');
-    const dataUrl = `data:application/pdf;base64,${base64Data}`;
+    const renderContext = {
+      canvasContext: context,
+      viewport: viewport,
+    };
+    
+    await page.render(renderContext).promise;
+    images.push(canvas.toDataURL('image/png'));
+    console.log(`🖼️ Page ${i} convertie en image.`);
+  }
+
+  return images;
+}
+
+
+async function processOCRWithMistral(images, fileName) {
+  try {
+    console.log(`🔍 Début du traitement OCR pour: ${fileName} (${images.length} image(s))`);
+
+    const userContent = [
+      {
+        type: "text",
+        text: "Analyse ce document et extrait tout le texte de manière structurée. Le document peut contenir plusieurs pages (images). Retourne uniquement le texte extrait, sans commentaires supplémentaires."
+      }
+    ];
+
+    images.forEach(dataUrl => {
+      userContent.push({
+        type: "image_url",
+        image_url: {
+          url: dataUrl
+        }
+      });
+    });
 
     // Configuration de la requête Mistral
     const requestBody = {
@@ -26,18 +68,7 @@ async function processOCRWithMistral(fileBuffer, fileName) {
       messages: [
         {
           role: "user",
-          content: [
-            {
-              type: "text",
-              text: "Analyse ce document PDF et extrait tout le texte de manière structurée. Respecte la mise en forme originale, les sauts de ligne, et la hiérarchie du contenu. Retourne uniquement le texte extrait, sans commentaires supplémentaires."
-            },
-            {
-              type: "image_url",
-              image_url: {
-                url: dataUrl
-              }
-            }
-          ]
+          content: userContent
         }
       ],
       max_tokens: 8000,
@@ -204,13 +235,17 @@ export default async function handler(req, res) {
       throw new Error(`Erreur upload: ${uploadError.message}`);
     }
 
-    // 2. Traitement OCR avec Mistral
-    const extractedText = await processOCRWithMistral(fileBuffer, file.originalFilename);
+    // 2. Conversion du PDF en images
+    console.log('🔄 Conversion du PDF en images...');
+    const images = await convertPdfToImages(fileBuffer);
 
-    // 3. Création du PDF OCRisé
+    // 3. Traitement OCR avec Mistral
+    const extractedText = await processOCRWithMistral(images, file.originalFilename);
+
+    // 4. Création du PDF OCRisé
     const ocrPdfBuffer = await createOCRPDF(extractedText, file.originalFilename);
 
-    // 4. Upload du PDF OCRisé
+    // 5. Upload du PDF OCRisé
     const ocrFileName = `ocr_${originalFileName}`;
     const ocrPath = `ocrises/${ocrFileName}`;
 
@@ -226,7 +261,7 @@ export default async function handler(req, res) {
       throw new Error(`Erreur upload OCR: ${ocrUploadError.message}`);
     }
 
-    // 5. Génération de l'URL de téléchargement
+    // 6. Génération de l'URL de téléchargement
     const { data: urlData } = supabase.storage
       .from('factures')
       .getPublicUrl(ocrPath);

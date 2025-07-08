@@ -2,5 +2,12 @@
   "name": "rational-consulting-ocr",
   "version": "1.0.0",
   "description": "Application OCR Intelligence par Rational Consulting",
-  "private": true
-} 
+  "private": true,
+  "dependencies": {
+    "@supabase/supabase-js": "^2.44.2",
+    "canvas": "^2.11.2",
+    "formidable": "^3.5.1",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "4.4.175"
+  }
+}
