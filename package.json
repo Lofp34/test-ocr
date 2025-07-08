@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Application OCR Intelligence par Rational Consulting",
   "private": true,
-  "type": "module",
   "dependencies": {
     "@mistralai/mistralai": "^0.5.0",
     "@supabase/supabase-js": "^2.44.2",

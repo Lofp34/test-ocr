@@ -2,7 +2,7 @@ import formidable from 'formidable';
 import { createClient } from '@supabase/supabase-js';
 import { PDFDocument, rgb } from 'pdf-lib';
 import fs from 'fs';
-import MistralClient from '@mistralai/mistralai';
+// Nous supprimons l'import statique ici
 
 // Configuration Supabase
 const supabase = createClient(
@@ -10,12 +10,16 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// Configuration Mistral
-const mistralClient = new MistralClient(process.env.MISTRAL_API_KEY);
+// La configuration Mistral sera faite dynamiquement
 
 async function processOCRWithMistral(fileBuffer, fileName) {
   try {
     console.log(`🔍 Début du traitement OCR pour: ${fileName} avec le modèle mistral-ocr-latest`);
+
+    // Importation dynamique de MistralAI
+    const MistralClientModule = await import('@mistralai/mistralai');
+    const MistralClient = MistralClientModule.default;
+    const mistralClient = new MistralClient(process.env.MISTRAL_API_KEY);
     
     // Convertir le buffer en base64
     const base64Pdf = fileBuffer.toString('base64');
