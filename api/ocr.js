@@ -1,6 +1,7 @@
-const formidable = require('formidable');
-const { createClient } = require('@supabase/supabase-js');
-const { PDFDocument, rgb } = require('pdf-lib');
+import formidable from 'formidable';
+import { createClient } from '@supabase/supabase-js';
+import { PDFDocument, rgb } from 'pdf-lib';
+import fs from 'fs';
 
 // Configuration Supabase
 const supabase = createClient(
@@ -184,7 +185,6 @@ export default async function handler(req, res) {
     console.log(`📁 Fichier reçu: ${file.originalFilename} (${file.size} bytes)`);
 
     // Lire le fichier
-    const fs = require('fs');
     const fileBuffer = fs.readFileSync(file.filepath);
 
     // 1. Upload du fichier original vers Supabase
